@@ -1,15 +1,14 @@
 import { useState } from "react";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm"; 
-import rehypeRaw from "rehype-raw"; 
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 
 const VideoAnalyzer = () => {
   const [videoUrl, setVideoUrl] = useState("");
   const [transcription, setTranscription] = useState("");
   const [factCheckedText, setFactCheckedText] = useState("");
   const [loading, setLoading] = useState(false);
-
 
   const extractVideoId = (url) => {
     const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
@@ -25,7 +24,9 @@ const VideoAnalyzer = () => {
 
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:5000/transcribe?videoId=${videoId}`);
+      const response = await axios.get(
+        `http://localhost:5000/transcribe?videoId=${videoId}`
+      );
       setTranscription(response.data.text);
     } catch (error) {
       console.error("Error fetching transcription:", error);
@@ -55,7 +56,9 @@ const VideoAnalyzer = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
       <div className="w-full max-w-8xl p-6 bg-gray-800 rounded-lg shadow-lg">
-        <h2 className="text-2xl font-bold text-center mb-4">🔍 YouTube Fake News Detector</h2>
+        {/* <h2 className="text-2xl font-bold text-center mb-4">
+          🔍 YouTube Fake News Detector
+        </h2> */}
 
         {/* Input Section */}
         <div className="flex flex-col space-y-4">
@@ -78,7 +81,13 @@ const VideoAnalyzer = () => {
         {transcription && (
           <div className="mt-6 p-4 bg-gray-700 rounded-lg shadow">
             <h3 className="text-lg font-semibold">🎙 Transcription:</h3>
-            <p className="mt-2 p-2 bg-gray-800 rounded-lg overflow-auto text-sm border-2 border-white">{transcription}</p>
+            <textarea
+              className="mt-2 p-2 bg-gray-800 rounded-lg overflow-auto text-sm border-2 border-white w-full h-60 resize-none"
+              readOnly
+            >
+              {transcription}
+            </textarea>
+            
             <button
               onClick={factCheckText}
               disabled={loading}
@@ -90,23 +99,33 @@ const VideoAnalyzer = () => {
         )}
 
         {factCheckedText && (
-  <div className="bg-gray-800 p-4 rounded-md mt-4 border border-white shadow-lg">
-    <h3 className="text-lg font-semibold text-white mb-2">✅ Fact-Checked Content:</h3>
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeRaw]}
-      components={{
-        strong: ({ children }) => <span className="text-red-400 font-bold">{children}</span>,
-        em: ({ children }) => <span className="text-green-400 italic">{children}</span>,
-        ul: ({ children }) => <ul className="list-disc pl-5">{children}</ul>,
-        ol: ({ children }) => <ol className="list-decimal pl-5">{children}</ol>,
-        li: ({ children }) => <li className="mb-1">{children}</li>,
-      }}
-    >
-      {factCheckedText}
-    </ReactMarkdown>
-  </div>
-)}
+          <div className="bg-gray-800 p-4 rounded-md mt-4 border border-white shadow-lg">
+            <h3 className="text-lg font-semibold text-white mb-2">
+              ✅ Fact-Checked Content:
+            </h3>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw]}
+              components={{
+                strong: ({ children }) => (
+                  <span className="text-red-400 font-bold">{children}</span>
+                ),
+                em: ({ children }) => (
+                  <span className="text-green-400 italic">{children}</span>
+                ),
+                ul: ({ children }) => (
+                  <ul className="list-disc pl-5">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="list-decimal pl-5">{children}</ol>
+                ),
+                li: ({ children }) => <li className="mb-1">{children}</li>,
+              }}
+            >
+              {factCheckedText}
+            </ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   );

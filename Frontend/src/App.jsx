@@ -1,10 +1,11 @@
-
-import Dashboard from './Dashboard'
+import VideoAnalyzer from './VideoAnalyzer'
+import MainPage from './MainPage'
 
 function App() {
   return (
     <div className='bg-gray-900 w-screen h-screen'>
-      <Dashboard/>
+      {/* <VideoAnalyzer/> */}
+      <MainPage />
     </div>
   )
 }
