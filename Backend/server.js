@@ -77,4 +77,23 @@ app.post("/fact-check", async (req, res) => {
     }
 });
 
+app.post("/text-analyzer", async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text) return res.status(400).json({ error: "Missing text" });
+
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" }); 
+        const prompt = `Check if the following text contains misinformation, hate speech, sexual violence, etc. If any part is harmful, highlight the fake part and provide the correct information point wise: ${text}`;
+
+        const result = await model.generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }] });
+        const responseText = result.response.text();
+
+        res.json({ factCheckedText: responseText });
+    } 
+    catch (error) {
+        console.error("Google Gemini API error:", error);
+        res.status(500).json({ error: "Fact-checking failed" });
+    }
+});
+
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));

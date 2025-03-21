@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import VideoAnalyzer from "./VideoAnalyzer";
+import TextAnalyzer from "./TextAnalyzer";
 
 const sampleData = [
   { name: "Category A", value: 40 },
@@ -42,6 +43,7 @@ export default function Dashboard() {
           ))} */}
 
           <VideoAnalyzer />
+          <TextAnalyzer />
         </div>
       </div>
 
