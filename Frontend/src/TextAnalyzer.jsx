@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import ReactMarkdown from "react-markdown";
 
 export default function TextAnalyzer() {
   const [inputText, setInputText] = useState("");
@@ -48,7 +49,14 @@ export default function TextAnalyzer() {
         {result && (
           <div className="mt-8 p-6 bg-gray-700 rounded-lg">
             <h2 className="text-2xl font-semibold mb-4 text-white">Fact-Checked Result:</h2>
-            <p className="whitespace-pre-wrap text-gray-300">{result}</p>
+            <ReactMarkdown
+              components={{
+                strong: ({ children }) => <strong className="text-yellow-400">{children}</strong>,
+                p: ({ children }) => <p className="text-gray-300">{children}</p>,
+              }}
+            >
+              {result}
+            </ReactMarkdown>
           </div>
         )}
       </div>
