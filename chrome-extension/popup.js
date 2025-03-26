@@ -1,10 +1,25 @@
-document.getElementById("scanPage").addEventListener("click", () => {
-    document.getElementById("status").innerText = "Scanning...";
+document.addEventListener('DOMContentLoaded', () => {
+    const scanButton = document.getElementById('scanPage');
+    const statusElement = document.getElementById('status');
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        chrome.tabs.sendMessage(tabs[0].id, { action: "startScan" }, (response) => {
-            console.log(response?.status || "No response from content script.");
-            document.getElementById("status").innerText = "Scan Complete!";
+    scanButton.addEventListener('click', () => {
+        console.log('Scan button clicked');
+        statusElement.innerText = 'Scanning...';
+        chrome.runtime.sendMessage({ action: 'startScan' }, (response) => {
+            console.log('Received response:', response);
+
+            if (chrome.runtime.lastError) {
+                console.error('Error:', chrome.runtime.lastError);
+                statusElement.innerText = 'Scan Failed: ' + chrome.runtime.lastError.message;
+                return;
+            }
+
+            if (response && response.detections) {
+                const count = response.detections.harmfulContent || 0;
+                statusElement.innerText = `Scan Complete! Harmful Content: ${count}`;
+            } else {
+                statusElement.innerText = 'No harmful content detected';
+            }
         });
     });
 });

@@ -1,41 +1,69 @@
-// Prevent multiple executions
-if (!window.hasRun) {
-    window.hasRun = true;
+// Wrap in IIFE to prevent global scope pollution
+(function() {
+    // Prevent multiple executions
+    if (window.contentScriptInjected) return;
+    window.contentScriptInjected = true;
 
-    const harmfulKeywords = ["fake news", "violence", "explicit", "misinformation", "hate speech"];
+    console.log("Content script loaded");
+
+    // Harmful keywords for detection
+    const harmfulKeywords = [
+        "fake news", "misinformation", "hate speech", 
+        "violence", "explicit", "conspiracy"
+    ];
 
     function scanPage() {
-        console.log("Scanning started...");
-        // document.body.style.border = "5px solid red"; // Indicate scanning
-
-        const elements = document.querySelectorAll("p, span, div, a");
-        let found = false;
+        console.log("Scanning page...");
+        const elements = document.querySelectorAll('p, div, span, h1, h2, h3');
+        let detections = { 
+            harmfulContent: 0,
+            matchedElements: []
+        };
 
         elements.forEach(element => {
-            harmfulKeywords.forEach(keyword => {
-                if (element.textContent.toLowerCase().includes(keyword)) {
-                    element.style.backgroundColor = "yellow";
-                    element.style.color = "red";
-                    found = true;
-                }
-            });
+            const text = element.textContent.toLowerCase();
+            const matches = harmfulKeywords.filter(keyword => 
+                text.includes(keyword)
+            );
+
+            if (matches.length > 0) {
+                // Highlight harmful content
+                element.style.backgroundColor = 'yellow';
+                element.style.color = 'red';
+                
+                detections.harmfulContent += matches.length;
+                detections.matchedElements.push({
+                    text: element.textContent,
+                    keywords: matches
+                });
+            }
         });
 
-        if (found) {
-            console.log("Harmful content detected!");
-        } else {
-            console.log("No harmful content found.");
-        }
-
-        // Notify popup.js that scanning is done
-        chrome.runtime.sendMessage({ action: "scanComplete" });
+        console.log("Scan results:", detections);
+        return detections;
     }
 
-    // Listen for scan trigger from popup.js
+    // Listen for scan requests
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        console.log("Content script received message:", request);
+        
         if (request.action === "startScan") {
-            scanPage();
-            sendResponse({ status: "Scanning started" });
+            try {
+                const results = scanPage();
+                sendResponse({ 
+                    status: "success", 
+                    detections: results 
+                });
+            } catch (error) {
+                console.error("Scan error:", error);
+                sendResponse({ 
+                    status: "error", 
+                    message: error.toString() 
+                });
+            }
         }
+        return true; // Indicate async response
     });
-}
+
+    console.log("Content script setup complete");
+})();
