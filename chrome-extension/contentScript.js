@@ -1,69 +1,159 @@
-// Wrap in IIFE to prevent global scope pollution
+// Gemini API Content Detection Script
 (function() {
     // Prevent multiple executions
     if (window.contentScriptInjected) return;
     window.contentScriptInjected = true;
 
-    console.log("Content script loaded");
+    // Gemini API Configuration
+    const GEMINI_API_KEY = "AIzaSyBACoTuYiJYrlF4e5hhHCjVK5IrDjA5DB4"; // Replace with your actual API key
+    const GEMINI_API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
 
-    // Harmful keywords for detection
-    const harmfulKeywords = [
-        "fake news", "misinformation", "hate speech", 
-        "violence", "explicit", "conspiracy"
-    ];
+    // Function to call Gemini API for content analysis
+    async function analyzeContentWithGemini(text) {
+        try {
+            const response = await fetch(GEMINI_API_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: `Carefully analyze the following text for potentially harmful content. 
+                                   Categorize and identify if the text contains:
+                                   1. Misinformation
+                                   2. Hate Speech
+                                   3. Explicit Content
+                                   4. Violent Content
 
-    function scanPage() {
-        console.log("Scanning page...");
-        const elements = document.querySelectorAll('p, div, span, h1, h2, h3');
-        let detections = { 
-            harmfulContent: 0,
-            matchedElements: []
+                                   Provide a concise analysis. Text to analyze:
+                                   "${text}"`
+                        }]
+                    }],
+                    generationConfig: {
+                        maxOutputTokens: 100,
+                        temperature: 0.2
+                    },
+                    safetySettings: [
+                        {
+                            category: 'HARM_CATEGORY_HATE_SPEECH',
+                            threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+                        },
+                        {
+                            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                            threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+                        }
+                    ]
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            console.log('Full Response:', data);
+
+            // Extract analysis from Gemini's response
+            const analysisText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            return parseGeminiResponse(analysisText);
+        } catch (error) {
+            console.error('Gemini API Error:', error);
+            return null;
+        }
+    }
+
+    // Parse Gemini's response into a structured format
+    function parseGeminiResponse(responseText) {
+        const categories = {
+            misinformation: responseText.toLowerCase().includes('misinformation'),
+            hateSpeech: responseText.toLowerCase().includes('hate speech'),
+            explicitContent: responseText.toLowerCase().includes('explicit content'),
+            violentContent: responseText.toLowerCase().includes('violent content')
         };
 
-        elements.forEach(element => {
-            const text = element.textContent.toLowerCase();
-            const matches = harmfulKeywords.filter(keyword => 
-                text.includes(keyword)
-            );
+        return {
+            harmful: Object.values(categories).some(Boolean),
+            categories: categories
+        };
+    }
 
-            if (matches.length > 0) {
-                // Highlight harmful content
-                element.style.backgroundColor = 'yellow';
-                element.style.color = 'red';
+    // Scan page and mark harmful content
+    async function scanPage() {
+        console.log("Gemini-powered content scanning started");
+        const elementsToScan = document.querySelectorAll('p, span, div, h1, h2, h3, a');
+        
+        let detections = {
+            misinformation: 0,
+            hateSpeech: 0,
+            explicitContent: 0,
+            violentContent: 0,
+            totalHarmfulElements: 0
+        };
+
+        // Process elements with rate limiting
+        for (const element of elementsToScan) {
+            const text = element.textContent.trim();
+            
+            // Skip very short texts
+            if (text.length < 10) continue;
+
+            try {
+                const analysis = await analyzeContentWithGemini(text);
                 
-                detections.harmfulContent += matches.length;
-                detections.matchedElements.push({
-                    text: element.textContent,
-                    keywords: matches
-                });
-            }
-        });
+                if (analysis && analysis.harmful) {
+                    // Highlight harmful content
+                    element.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+                    element.style.border = '2px solid red';
+                    element.style.color = 'darkred';
 
-        console.log("Scan results:", detections);
+                    // Update detection counts
+                    Object.entries(analysis.categories).forEach(([category, isHarmful]) => {
+                        if (isHarmful) {
+                            detections[category]++;
+                        }
+                    });
+
+                    detections.totalHarmfulElements++;
+
+                    // Add tooltip with details
+                    const harmfulCategories = Object.entries(analysis.categories)
+                        .filter(([_, isHarmful]) => isHarmful)
+                        .map(([category, _]) => category)
+                        .join(', ');
+                    
+                    element.setAttribute('title', `Harmful Content Detected: ${harmfulCategories}`);
+                }
+            } catch (error) {
+                console.error('Scanning error:', error);
+            }
+
+            // Simple rate limiting to avoid overwhelming API
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+
+        console.log("Scan complete", detections);
         return detections;
     }
 
-    // Listen for scan requests
+    // Listen for scan trigger
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        console.log("Content script received message:", request);
-        
         if (request.action === "startScan") {
-            try {
-                const results = scanPage();
+            scanPage().then(results => {
                 sendResponse({ 
-                    status: "success", 
+                    status: "Scan Complete", 
                     detections: results 
                 });
-            } catch (error) {
-                console.error("Scan error:", error);
+            }).catch(error => {
                 sendResponse({ 
-                    status: "error", 
-                    message: error.toString() 
+                    status: "Scan Failed", 
+                    error: error.message 
                 });
-            }
+            });
+            return true; // Indicates async response
         }
-        return true; // Indicate async response
     });
 
-    console.log("Content script setup complete");
+    console.log("Gemini Content Detection Script Loaded");
 })();
