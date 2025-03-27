@@ -1,19 +1,25 @@
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "startScan") {
-        // Forward scan request to active tab
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs[0]) {
-                try {
-                    chrome.tabs.sendMessage(tabs[0].id, { action: "startScan" }, (response) => {
-                        // Relay response back to popup
-                        sendResponse(response);
-                    });
-                } catch (error) {
-                    console.error("Background script error:", error);
-                    sendResponse({ status: "Error", message: error.toString() });
-                }
+            if (tabs.length === 0) {
+                console.error("No active tab found.");
+                sendResponse({ status: "Error", message: "No active tab found" });
+                return;
             }
+
+            const activeTab = tabs[0].id;
+
+            chrome.tabs.sendMessage(activeTab, { action: "startScan" }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error("Error sending message to content script:", chrome.runtime.lastError);
+                    sendResponse({ status: "Error", message: chrome.runtime.lastError.message });
+                    return;
+                }
+
+                sendResponse(response);
+            });
         });
-        return true; // Indicates async response
+
+        return true; // Keep sendResponse valid for async operations
     }
 });
