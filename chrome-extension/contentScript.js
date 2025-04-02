@@ -2,7 +2,7 @@
     if (window.contentScriptInjected) return;
     window.contentScriptInjected = true;
 
-    const GEMINI_API_KEY = "MyApiKey"; // Replace with your actual API key
+    const GEMINI_API_KEY = "AIzaSyBACoTuYiJYrlF4e5hhHCjVK5IrDjA5DB4"; // Replace with your actual API key
     const GEMINI_API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
     const requestQueue = [];
