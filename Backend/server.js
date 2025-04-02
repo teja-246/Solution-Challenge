@@ -12,5 +12,5 @@ import userRouter from './functions/src/routes/user.route.js'
 
 //routes declaration
 app.use(userRouter)
-
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${process.env.PORT}`));
