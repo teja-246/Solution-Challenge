@@ -40,42 +40,84 @@ const transcribe = asyncHandler(async (req, res) => {
     const videoId = req.query.videoId;
     if (!videoId) return res.status(400).json({ error: "Missing videoId" });
 
-    const outputFilePattern = path.join(__dirname, "captions.%(ext)s");
-    // const command = `yt-dlp --cookies cookies.txt -j "https://www.youtube.com/watch?v=${videoId}"`;
-    const command = `yt-dlp --write-auto-sub --sub-lang en --skip-download --cookies cookies.txt -j "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"`;
+    const outputFilePattern = path.join(__dirname, "captions_%(id)s.%(ext)s");
+const command = `yt-dlp --write-auto-sub --sub-lang en --skip-download --cookies cookies.txt -j "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"`;
 
-    exec(command, async (error, stdout, stderr) => {
-        if (error) {
-            console.error("yt-dlp error:", stderr);
-            return res.status(500).json({ error: "Failed to fetch captions" });
-        }
+exec(command, async (error, stdout, stderr) => {
+    if (error) {
+        console.error("yt-dlp error:", stderr);
+        return res.status(500).json({ error: "Failed to fetch captions" });
+    }
 
-        // Check if captions were generated
-        let captionFile;
-        if (fs.existsSync(path.join(__dirname, "captions.en.vtt"))) {  // <-- FIXED
-            captionFile = path.join(__dirname, "captions.en.vtt");
-        } else if (fs.existsSync(path.join(__dirname, "captions.en.srt"))) {
-            captionFile = path.join(__dirname, "captions.en.srt");
-        } else {
-            console.error("Captions file not found");
-            return res.status(500).json({ error: "Captions not available for this video" });
-        }
+    const vttPath = path.join(__dirname, `captions_${videoId}.en.vtt`);
+    const srtPath = path.join(__dirname, `captions_${videoId}.en.srt`);
 
+    let captionFile;
+    if (fs.existsSync(vttPath)) {
+        captionFile = vttPath;
+    } else if (fs.existsSync(srtPath)) {
+        captionFile = srtPath;
+    } else {
+        console.error("Captions file not found");
+        return res.status(500).json({ error: "Captions not available for this video" });
+    }
+
+    try {
+        const data = await fs.promises.readFile(captionFile, "utf8");
+        const cleanedText = cleanWebVTT(data);
+        res.json({ text: cleanedText });
+    } catch (readError) {
+        console.error("Error reading captions:", readError);
+        return res.status(500).json({ error: "Error processing captions" });
+    } finally {
         try {
-            const data = await fs.promises.readFile(captionFile, "utf8");
-            const cleanedText = cleanWebVTT(data);
-            res.json({ text: cleanedText });
-        } catch (readError) {
-            console.error("Error reading captions:", readError);
-            return res.status(500).json({ error: "Error processing captions" });
-        } finally {
-            try {
-                await fs.promises.unlink(captionFile);
-            } catch (err) {
-                console.warn("Failed to delete caption file:", err);
-            }
+            await fs.promises.unlink(captionFile);
+        } catch (err) {
+            console.warn("Failed to delete caption file:", err);
         }
-    });
+    }
+});
+
+
+
+
+
+    // const outputFilePattern = path.join(__dirname, "captions.%(ext)s");
+    // // const command = `yt-dlp --cookies cookies.txt -j "https://www.youtube.com/watch?v=${videoId}"`;
+    // const command = `yt-dlp --write-auto-sub --sub-lang en --skip-download --cookies cookies.txt -j "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"`;
+
+    // exec(command, async (error, stdout, stderr) => {
+    //     if (error) {
+    //         console.error("yt-dlp error:", stderr);
+    //         return res.status(500).json({ error: "Failed to fetch captions" });
+    //     }
+
+    //     // Check if captions were generated
+    //     let captionFile;
+    //     if (fs.existsSync(path.join(__dirname, "captions.en.vtt"))) {  // <-- FIXED
+    //         captionFile = path.join(__dirname, "captions.en.vtt");
+    //     } else if (fs.existsSync(path.join(__dirname, "captions.en.srt"))) {
+    //         captionFile = path.join(__dirname, "captions.en.srt");
+    //     } else {
+    //         console.error("Captions file not found");
+    //         return res.status(500).json({ error: "Captions not available for this video" });
+    //     }
+
+    //     try {
+    //         const data = await fs.promises.readFile(captionFile, "utf8");
+    //         const cleanedText = cleanWebVTT(data);
+    //         res.json({ text: cleanedText });
+    //     } catch (readError) {
+    //         console.error("Error reading captions:", readError);
+    //         return res.status(500).json({ error: "Error processing captions" });
+    //     } finally {
+    //         try {
+    //             await fs.promises.unlink(captionFile);
+    //         } catch (err) {
+    //             console.warn("Failed to delete caption file:", err);
+    //         }
+    //     }
+    // });
 });
 
 const factCheck = asyncHandler(async (req, res) => {
