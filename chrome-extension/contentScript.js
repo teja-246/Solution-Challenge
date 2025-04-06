@@ -86,7 +86,7 @@
 
     async function scanPage() {
         console.log("🔍 Starting content scan...");
-        const elementsToScan = document.querySelectorAll("p, span, div, h1, h2, h3, a");
+        const elementsToScan = document.querySelectorAll("p, span, div, h1, h2, h3, a, em");
 
         let detections = {
             misinformation: 0,
@@ -124,7 +124,9 @@
                     return;
                 }
 
-                if (analysis.harmful) {
+                if (analysis.harmful == true) {
+                    console.log("trying dom manipulation");
+                    
                     const element = elementMap.get(text);
                     element.style.backgroundColor = "rgba(255, 0, 0, 0.3)";
                     element.style.border = "2px solid red";

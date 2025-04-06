@@ -14,7 +14,7 @@ export default function TextAnalyzer() {
     }
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost:5000/text-analyzer", {
+      const response = await axios.post("https://solution-challenge-06lp.onrender.com/text-analyzer", {
         text: inputText,
       });
       setResult(response.data.factCheckedText);

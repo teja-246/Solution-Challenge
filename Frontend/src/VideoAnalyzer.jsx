@@ -25,7 +25,7 @@ const VideoAnalyzer = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `http://localhost:5000/transcribe?videoId=${videoId}`
+        `https://solution-challenge-06lp.onrender.com/transcribe?videoId=${videoId}`
       );
       setTranscription(response.data.text);
     } catch (error) {
@@ -41,7 +41,7 @@ const VideoAnalyzer = () => {
     setLoading(true);
     try {
       const response = await axios.post(
-        "http://localhost:5000/fact-check",
+        "https://solution-challenge-06lp.onrender.com/fact-check",
         { text: transcription },
         { headers: { "Content-Type": "application/json" } }
       );
