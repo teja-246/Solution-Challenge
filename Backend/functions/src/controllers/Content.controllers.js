@@ -8,7 +8,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import os from "os";
-import { fileURLToPath } from "url";
 
 dotenv.config();
 
