@@ -40,9 +40,10 @@ const transcribe = asyncHandler(async (req, res) => {
     const videoId = req.query.videoId;
     if (!videoId) return res.status(400).json({ error: "Missing videoId" });
 
+    const cookiesPath = path.join(__dirname, "cookies.txt");
     const outputFilePattern = path.join(__dirname, "captions_%(id)s.%(ext)s");
-const command = `yt-dlp --write-auto-sub --sub-lang en --skip-download --cookies cookies.txt -j "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"`;
-
+const command = `yt-dlp --cookies "${cookiesPath}" --write-auto-sub --sub-lang en --skip-download "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"`;
+// yt-dlp --cookies "${cookiesPath}" --write-auto-sub --sub-lang en --skip-download "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"
 exec(command, async (error, stdout, stderr) => {
     if (error) {
         console.error("yt-dlp error:", stderr);
