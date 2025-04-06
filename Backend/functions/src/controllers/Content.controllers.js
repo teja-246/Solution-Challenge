@@ -41,22 +41,18 @@ const transcribe = asyncHandler(async (req, res) => {
     const videoId = req.query.videoId;
     if (!videoId) return res.status(400).json({ error: "Missing videoId" });
 
-    // Create a cookies directory that's writable in the Render environment
+    // Create temp files with unique names
     const tempDir = os.tmpdir();
     const cookiesPath = path.join(tempDir, `youtube-cookies-${Date.now()}.txt`);
     
-    // Check if we have cookies in the environment variable
     if (!process.env.YOUTUBE_COOKIES) {
         console.error("YOUTUBE_COOKIES environment variable is not set");
         return res.status(500).json({ error: "YouTube authentication not configured" });
     }
     
-    // Write cookies from environment variable to file
     try {
         await fs.promises.writeFile(cookiesPath, process.env.YOUTUBE_COOKIES, 'utf8');
-        // Log to verify file was created and has content
-        const stats = await fs.promises.stat(cookiesPath);
-        console.log(`Created cookies file at ${cookiesPath} (${stats.size} bytes)`);
+        console.log(`Created cookies file at ${cookiesPath}`);
     } catch (err) {
         console.error("Error writing cookies file:", err);
         return res.status(500).json({ error: "Failed to setup authentication" });
@@ -64,42 +60,51 @@ const transcribe = asyncHandler(async (req, res) => {
 
     const outputFilePattern = path.join(tempDir, `captions-${videoId}-${Date.now()}.%(ext)s`);
     
-    // Debug output to see the exact command being executed
-    const command = `yt-dlp --verbose --cookies "${cookiesPath}" --write-auto-sub --sub-lang en --skip-download "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"`;
+    // Add user-agent and referer to make the request look more like a browser
+    const command = `yt-dlp --verbose --cookies "${cookiesPath}" --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36" --referer "https://www.youtube.com/" --write-auto-sub --sub-lang en --skip-download "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"`;
+    
     console.log("Executing command:", command);
     
     exec(command, async (error, stdout, stderr) => {
         console.log("yt-dlp stdout:", stdout);
         
-        if (error || stderr.includes("ERROR:")) {
+        if (error) {
             console.error("yt-dlp error:", stderr);
-            return res.status(500).json({ error: "Failed to fetch captions: " + stderr });
+            return res.status(500).json({ error: "Failed to fetch captions: " + stderr.slice(0, 200) + "..." });
         }
 
-        // Find the generated caption file - use glob to find it based on pattern
         try {
-            const captionFiles = await glob(`${tempDir}/captions-${videoId}-*.en.{vtt,srt}`);
+            // Look for the caption files using glob pattern matching
+            const glob = require('glob');
+            const captionPattern = path.join(tempDir, `captions-${videoId}-*.en.{vtt,srt}`);
             
-            if (captionFiles.length === 0) {
-                console.error("No caption files found");
-                return res.status(500).json({ error: "Captions not available for this video" });
-            }
-            
-            const captionFile = captionFiles[0];
-            console.log("Found caption file:", captionFile);
-            
-            const data = await fs.promises.readFile(captionFile, "utf8");
-            const cleanedText = cleanWebVTT(data);
-            
-            // Clean up files
-            try {
-                await fs.promises.unlink(captionFile);
-                await fs.promises.unlink(cookiesPath);
-            } catch (cleanupErr) {
-                console.warn("Failed to clean up files:", cleanupErr);
-            }
-            
-            res.json({ text: cleanedText });
+            glob(captionPattern, async (err, files) => {
+                if (err || files.length === 0) {
+                    console.error("No caption files found:", err || "Empty result");
+                    return res.status(500).json({ error: "Captions not available for this video" });
+                }
+                
+                const captionFile = files[0];
+                console.log("Found caption file:", captionFile);
+                
+                try {
+                    const data = await fs.promises.readFile(captionFile, "utf8");
+                    const cleanedText = cleanWebVTT(data);
+                    
+                    // Clean up
+                    try {
+                        await fs.promises.unlink(captionFile);
+                        await fs.promises.unlink(cookiesPath);
+                    } catch (cleanupErr) {
+                        console.warn("Failed to clean up files:", cleanupErr);
+                    }
+                    
+                    res.json({ text: cleanedText });
+                } catch (readErr) {
+                    console.error("Error reading caption file:", readErr);
+                    return res.status(500).json({ error: "Error processing captions" });
+                }
+            });
         } catch (processErr) {
             console.error("Error processing captions:", processErr);
             return res.status(500).json({ error: "Error processing captions" });
