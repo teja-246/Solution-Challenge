@@ -43,60 +43,66 @@ const transcribe = asyncHandler(async (req, res) => {
 
     // Create a cookies directory that's writable in the Render environment
     const tempDir = os.tmpdir();
-    const cookiesPath = path.join(tempDir, "youtube-cookies.txt");
-
+    const cookiesPath = path.join(tempDir, `youtube-cookies-${Date.now()}.txt`);
+    
+    // Check if we have cookies in the environment variable
+    if (!process.env.YOUTUBE_COOKIES) {
+        console.error("YOUTUBE_COOKIES environment variable is not set");
+        return res.status(500).json({ error: "YouTube authentication not configured" });
+    }
+    
     // Write cookies from environment variable to file
-    // Make sure to add this as an environment variable in Render dashboard
     try {
-        await fs.promises.writeFile(cookiesPath, process.env.YOUTUBE_COOKIES || '', 'utf8');
+        await fs.promises.writeFile(cookiesPath, process.env.YOUTUBE_COOKIES, 'utf8');
+        // Log to verify file was created and has content
+        const stats = await fs.promises.stat(cookiesPath);
+        console.log(`Created cookies file at ${cookiesPath} (${stats.size} bytes)`);
     } catch (err) {
         console.error("Error writing cookies file:", err);
         return res.status(500).json({ error: "Failed to setup authentication" });
     }
 
-    const outputFilePattern = path.join(tempDir, `captions_${videoId}.%(ext)s`);
-
-    // Use double quotes around paths for Windows compatibility
-    const command = `yt-dlp --cookies "${cookiesPath}" --write-auto-sub --sub-lang en --skip-download "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"`;
-
+    const outputFilePattern = path.join(tempDir, `captions-${videoId}-${Date.now()}.%(ext)s`);
+    
+    // Debug output to see the exact command being executed
+    const command = `yt-dlp --verbose --cookies "${cookiesPath}" --write-auto-sub --sub-lang en --skip-download "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"`;
+    console.log("Executing command:", command);
+    
     exec(command, async (error, stdout, stderr) => {
-        if (error) {
+        console.log("yt-dlp stdout:", stdout);
+        
+        if (error || stderr.includes("ERROR:")) {
             console.error("yt-dlp error:", stderr);
-            return res.status(500).json({ error: "Failed to fetch captions" });
+            return res.status(500).json({ error: "Failed to fetch captions: " + stderr });
         }
 
-        const vttPath = path.join(tempDir, `captions_${videoId}.en.vtt`);
-        const srtPath = path.join(tempDir, `captions_${videoId}.en.srt`);
-
-        let captionFile;
-        if (await fileExists(vttPath)) {
-            captionFile = vttPath;
-        } else if (await fileExists(srtPath)) {
-            captionFile = srtPath;
-        } else {
-            console.error("Captions file not found");
-            return res.status(500).json({ error: "Captions not available for this video" });
-        }
-
+        // Find the generated caption file - use glob to find it based on pattern
         try {
+            const captionFiles = await glob(`${tempDir}/captions-${videoId}-*.en.{vtt,srt}`);
+            
+            if (captionFiles.length === 0) {
+                console.error("No caption files found");
+                return res.status(500).json({ error: "Captions not available for this video" });
+            }
+            
+            const captionFile = captionFiles[0];
+            console.log("Found caption file:", captionFile);
+            
             const data = await fs.promises.readFile(captionFile, "utf8");
             const cleanedText = cleanWebVTT(data);
-            res.json({ text: cleanedText });
-        } catch (readError) {
-            console.error("Error reading captions:", readError);
-            return res.status(500).json({ error: "Error processing captions" });
-        } finally {
-            // Clean up temporary files
+            
+            // Clean up files
             try {
-                if (await fileExists(captionFile)) {
-                    await fs.promises.unlink(captionFile);
-                }
-                if (await fileExists(cookiesPath)) {
-                    await fs.promises.unlink(cookiesPath);
-                }
-            } catch (err) {
-                console.warn("Failed to delete temporary files:", err);
+                await fs.promises.unlink(captionFile);
+                await fs.promises.unlink(cookiesPath);
+            } catch (cleanupErr) {
+                console.warn("Failed to clean up files:", cleanupErr);
             }
+            
+            res.json({ text: cleanedText });
+        } catch (processErr) {
+            console.error("Error processing captions:", processErr);
+            return res.status(500).json({ error: "Error processing captions" });
         }
     });
 });
