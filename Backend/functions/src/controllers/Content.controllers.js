@@ -41,7 +41,8 @@ const transcribe = asyncHandler(async (req, res) => {
     if (!videoId) return res.status(400).json({ error: "Missing videoId" });
 
     const outputFilePattern = path.join(__dirname, "captions.%(ext)s");
-    const command = `yt-dlp --write-auto-sub --sub-lang en --skip-download "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"`;
+    // const command = `yt-dlp --cookies cookies.txt -j "https://www.youtube.com/watch?v=${videoId}"`;
+    const command = `yt-dlp --write-auto-sub --sub-lang en --skip-download --cookies cookies.txt -j "https://www.youtube.com/watch?v=${videoId}" -o "${outputFilePattern}"`;
 
     exec(command, async (error, stdout, stderr) => {
         if (error) {
