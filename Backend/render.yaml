@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: your-backend-name
+    name: Backend
     env: node
     buildCommand: |
       pip install -r requirements.txt
